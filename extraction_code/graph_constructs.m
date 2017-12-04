@@ -29,15 +29,15 @@ gsp_plot_graph(G);
 %% Aggregation of several months
 clear all;
 N = 366572;
-nb_years = 1;
+nb_years = 3;
 start_year = 1992;
-study_end = 2013;
+study_end = 2008;
 
-thres = 1;
-k_thres = 50;
+thres = 20;
+k_thres = 0;
 
 filter_not_frequent = false;
-attempt_name = 'attempt4';
+attempt_name = 'attempt6';
 
 bfs_par = struct('verbose', 0, 'threshold', 0.8);
 
@@ -50,14 +50,17 @@ pres_thres20 = sparse(N, nb_cols);
 pres_th20_100 = sparse(N, nb_cols);
 pres_final_gt = sparse(N, nb_cols);
 
+load(sprintf('/mnt/data/Arxiv/matgraphs/%s/presence_thres20.mat', attempt_name));
+load(sprintf('/mnt/data/Arxiv/matgraphs/%s/presence_th20_100times.mat', attempt_name));
+
 components = zeros(1, nb_cols);
 % graphz = cell(nb_cols, 1);
 
 STEPS = {'thresholding', 'frequent presence', 'connectivity'};
 
 %%
-for step = 3:3
-    
+for step = 1:3
+
     fprintf('Step %d - %s\n\n', step, STEPS{step});
 
     if step == 2
@@ -68,7 +71,7 @@ for step = 3:3
         else
             pres_th20_100 = pres_thres20;
         end
-        
+
         fprintf('Done.\n');
 
     else
@@ -91,8 +94,10 @@ for step = 3:3
 
         if step == 1
             pres_idx = find(sum(all_W(auth, auth), 1) >= thres);
-
             pres_thres20(auth(pres_idx), 1) = 1;
+
+%             pres_idx = find(sum(all_W, 1) >= thres);
+%             pres_thres20(pres_idx, 1) = 1;
 
             fprintf('\t%d.\n', numel(pres_idx));
 
@@ -104,7 +109,7 @@ for step = 3:3
 
                 GW = all_W(pres_idx, pres_idx);
                 if k_thres > 0
-                    
+
                     Gii = zeros(1, Ni*k_thres);
                     Gjj = zeros(1, Ni*k_thres);
                     Gvv = zeros(1, Ni*k_thres);
@@ -134,13 +139,15 @@ for step = 3:3
                 prez_idx = pres_idx(comps_id == comp_id);
                 pres_final_gt(prez_idx, 1) = 1;
                 G = gsp_graph(all_W(prez_idx, prez_idx));
+                G.nodes_idx = prez_idx;
+                assert(numel(prez_idx) == G.N);
 %                 graphz{1} = G;
-                save(sprintf('../matgraphs/%s/graphs/G1.mat', attempt_name), 'G');
+                save(sprintf('../matgraphs/%s/graphs/G_1.mat', attempt_name), 'G');
             end
             fprintf('\t%d, %d\n', numel(pres_idx), components(1));
 
         end
-        
+
         for ii = start_year+nb_years:study_end
             for jj = 1:12
                 mon = num2str(jj);
@@ -166,6 +173,9 @@ for step = 3:3
                 if step == 1
                     pres_idx = find(sum(all_W(auth, auth), 1) >= thres);
                     pres_thres20(auth(pres_idx), idx) = 1;
+
+%                     pres_idx = find(sum(all_W, 1) >= thres);
+%                     pres_thres20(pres_idx, idx) = 1;
 
                     fprintf('\t%d.\n', numel(pres_idx));
 
@@ -207,6 +217,8 @@ for step = 3:3
                         prez_idx = pres_idx(comps_id == comp_id);
                         pres_final_gt(prez_idx, idx) = 1;
                         G = gsp_graph(all_W(prez_idx, prez_idx));
+                        G.nodes_idx = prez_idx;
+                        assert(numel(prez_idx) == G.N);
 %                         graphz{idx} = G;
                         save(sprintf('../matgraphs/%s/graphs/G_%d.mat', attempt_name, idx), 'G');
 
@@ -229,23 +241,3 @@ for step = 3:3
 %         clear graphz;
     end
 end
-
-%%
-
-diff_pres = diff(presence, 1, 2);
-never_disapearing_nodes = find(sum(abs(diff_pres)-diff_pres, 2)==0);
-always_on_nodes = find(presence(never_disapearing_nodes, 1));
-
-[disapearing_node, disapering_month] = ind2sub(size(presence), find(diff_pres<0));
-
-given_year = 2002; given_month = 1;
-node_exist_in_month = find(presence(:, 12*(given_year-start_year-nb_years)+given_month+1));
-
-
-idx_remove = setdiff(1:N, all_authors);
-nb_auth = length(all_authors);
-all_W(idx_remove, :) = []; all_W(:, idx_remove) = []; all_W(1:nb_auth+1:end) = 0;
-G = gsp_graph(all_W);
-% TODO : Generate coordinates
-plot_params.show_edges = 1;
-gsp_plot_graph(G, plot_params);
